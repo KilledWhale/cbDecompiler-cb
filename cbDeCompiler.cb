@@ -1,0 +1,587 @@
+//////////////////////////////
+//cbDeCompiler ver 0.1.0 Beta
+
+SCREEN 1024, 768
+
+Include "dims.cb"
+Include "functions.cb"
+Include "commands.cb"
+
+Const STRINGS_OUT_DEFAULT = 1
+Const USE_TABS_DEFAULT = 0
+
+Global stringsOut As Byte, useTabs As Byte
+
+stringsOut = STRINGS_OUT_DEFAULT
+useTabs = USE_TABS_DEFAULT
+
+Dim file As String
+file$ = "languange.exe"
+
+outdir$ = "cbexe"
+
+If Not IsDirectory(outdir$) Then
+	MakeDir outdir$
+EndIf
+r
+f = OpenToEdit(file$)
+	w = OpenToWrite(outdir$ + "\decompiled.txt")
+		SeekFile f, FileSize(file$) - 4 // Hypataan tiedoston viimeiseen kokolukuun joka kertoo tavukoodin alkukohdan
+		off_ = ReadInt(f)
+		SeekFile f, FileSize(file$) - off_ + 16 // Hypataan tavukoodin alkukohtaan
+		
+		num_cmd = ReadInt(f) // Luetaan montako komentoa tavukoodi sisaltaa
+		
+		b = ReadInt(f) // Eos
+		
+		num_strings = ReadInt(f) // Montako merkkijonoa ohjelma sis‰lt‰‰
+		
+		If stringsOut Then
+			sf = OpenToWrite(outdir$ + "\strings.txt")
+		EndIf
+		
+		ReDim string_(num_strings)
+		For i = 1 To num_strings // Kaydaan kaikki ohjelman merkkijonot lapi, epasalataan ne ja luetaan ne muistiin
+			string_(i) = DecryptExeString(ReadString(f))
+			If stringsOut Then WriteLine sf, string_(i)
+		Next i
+		SeekFile f, FileOffset(f) + 32 // Ohitetaan 32 tarkistustavua
+		
+		If stringsOut Then
+			CloseFile sf
+		EndIf
+		
+		codeOffset = FileOffset(f) // Otetaan tavukoodin alkukohta muistiin
+		
+		// Esiparsintaa (funktiot)
+		For i = 1 To num_cmd
+			cmd = ReadByte(f)
+			Select cmd
+				Case 67
+					intg = ReadInt(f)
+					Select intg
+						Case 30
+							n = 0
+							For a = 1 To 7
+								b = ReadByte(f)
+								b = ReadInt(f)
+							Next a
+							
+							Repeat
+								a = ReadByte(f)
+								a = ReadInt(f)
+								If a <> 79 Then
+									SeekFile f, FileOffset(f) - 5
+									Exit
+								Else
+									a = ReadByte(f)
+									a = ReadInt(f)
+									
+									a = ReadByte(f)
+									a = ReadInt(f)
+									
+									n = n + 1
+								EndIf
+							Forever
+
+							fu.function_ = New(function_)
+							fu\p = n
+							fu\id = i
+							functions = functions + 1
+							fu\name = "Function" + functions
+							i = i + 7 + n * 3
+					EndSelect
+				Case 79
+					a = ReadByte(f)
+				Default
+					a = ReadInt(f)
+			EndSelect
+		Next i
+
+		functions = 0
+		SeekFile f, codeOffset
+		Global i
+		For i = 1 To num_cmd
+			cmds = cmds + 1 // Kasvatetaan kaytyjen komentojen maaraa
+			cmd = ReadByte(f)
+			Select cmd
+				Case 65 // Kokonaislukumuuttujan arvon asetus
+					var = ReadInt(f)
+					AddLine("Integer" + var + "% = " + pop(), totcmd)
+					totcmd = totcmd + cmds
+					cmds = 0
+				Case 66 // Liukulukumuuttujan arvon asetus
+					var = ReadInt(f)
+					AddLine("Float" + var + "# = " + pop(), totcmd)
+					totcmd = totcmd + cmds
+					cmds = 0
+				Case 67 // Komento
+					intg = ReadInt(f) ' Luetaan komento
+					
+					If totcmd = skipgotos And intg <> 7 and skipgotos > 0 Then
+						addLine("Default", -1)
+						skipGotos = 0
+					EndIf
+					
+					Select intg
+						Case 6 // Select
+							a = ReadByte(f)
+							n = ReadInt(f)
+
+							i + 1
+							cmds + 1
+
+							Addline("Select " + pop() + " //" + n, totcmd)
+							skipgotos = n
+						Case 7 // Case
+							a = ReadByte(f)
+							n = ReadInt(f)
+							
+							a = ReadByte(f)
+							b = ReadInt(f)
+							
+							If (skipgotos = totcmd) Then
+								skipgotos = b
+							EndIf
+							
+							tstr$ = ""
+							For t = 1 To n
+								a = ReadByte(f)
+								tstr$ = tstr$ + ", " + ReadInt(f)
+							Next t
+							
+							i = i + n + 2
+							cmds = cmds + n + 2
+							
+							addLine("Case " + Mid(tstr, 3) + " //" + b, totcmd)
+						Case 12, 21 // Goto ja Gosub
+							a = ReadByte(f)
+							n = ReadInt(f)
+							cmds + 1
+							i + 1
+							If (skipGotos <= i And skipGotos <> 0 ) Then
+								//af.afterparse = New(afterParse)
+								//af\s = "EndSelect"
+								//af\num = n
+							Else
+								j.jump = New(jump)
+								j\src = totcmd
+								j\dest = n
+								addline(commandN(intg) + " ", totcmd)
+							EndIf
+						Case 22 // Return
+							If inFunction Then
+								addLine(commandN(intg) + " " + get(commandP(intg)), totcmd)
+							Else
+								addLine(commandN(intg), totcmd)
+							EndIf
+						Case 30
+							If inFunction Then
+								addLine("EndFunction", 0)
+							EndIf
+							inFunction = 1
+							clearTypePointers()
+							a = ReadByte(f)
+							n = ReadInt(f)
+							For a = 1 To 6
+								b = ReadByte(f)
+								b = ReadInt(f)
+							Next a
+							tstr$ = ""
+							For a = 1 To getFunctionParamAmount(i)
+								b = ReadByte(f)
+								b = ReadInt(f)
+								b = ReadByte(f)
+								ttype = ReadInt(f)
+								b = ReadByte(f)
+								varnum = ReadInt(f)
+								tstr$ = StrInsert(tstr$, 0, ", " + otherArrayTypes(ttype) + varnum + " As " + otherArrayTypes(ttype))
+							Next a
+							tstr$ = Mid(tstr$, 3)
+							
+							addline("Function " + getFunctionName(i) + "(" + tstr$ + ")", totcmd)
+							
+							cmds = cmds + getFunctionParamAmount(i) * 3 + 7
+							i = i + getFunctionParamAmount(i) * 3 + 7
+						Case 42, 43 // Dim ja ReDim
+							a = ReadByte(f)
+							n = ReadInt(f)
+							
+							tstr$ = ""
+							For a = 1 To n
+								tstr$ = StrInsert(tstr$, 0, ", " + pop())
+							Next a
+							tstr$ = Mid(tstr$, 3)
+							
+							a = ReadByte(f)
+							arrType = ReadInt(f)
+							
+							a = ReadByte(f)
+							arrId = ReadInt(f)
+							
+							If arrayTypes(arrType) = "" Then
+								Print "Unknown array Type " + arrType
+							EndIf
+							
+							addLine(commandN(intg) + " " + arrayTypes(arrType) + "Array" + arrId + "(" + tstr$ + ") As " + arrayTypes(arrType), totcmd)
+
+							i = i + 3
+							cmds = cmds + 3
+						Case 70 // Funktiokutsu
+							addLine(pop(), totcmd)
+						Case 95
+							pop()
+							a = ReadByte(f)
+							a = ReadInt(f)
+							a = ReadByte(f)
+							a = ReadInt(f)
+							types = types + 1
+							addLine("Type Type" + types, totcmd)
+							addLine("EndType", 0)
+							typ.bytecodetype_ = New(bytecodetype_)
+							typ\st = totcmd
+							typ\id = types
+							
+							cmds = cmds + 2
+							i = i + 2
+						Case 97,98
+							get(5)
+						Case 99
+							get(6)
+						Case 80 // Globaalit
+							ass = pop()
+							bss = pop()
+							css$ = pop()
+							addLine("Global" + otherArrayTypes(ass) + bss + " = " + css, totcmd)
+							globalAccess(bss, ass)
+						Case 81 // Tyyppimuuttujaan sijoitus
+							t = pop()
+							tid = pop()
+							tempstr$ = otherArrayTypes(t) + pop()
+							Print t + " - " + tid + tempstr
+							typeAccess(getTypeId(tid), tempstr$ + " As " + otherArrayTypes(t))
+							addLine("TypePointer" + tid + "\"+ tempstr$ + " = " + pop(), totcmd)
+						Case 77 // Merkkijono tai tyyppisijoitus
+							t = pop()
+							Select t
+								Case 1
+									AddLine("String" + GetP(GetPAmount()) + "$ = " + GetP(GetPAmount() - 1), totcmd)
+									pop()
+									pop()
+								Case 4
+									pointerid = pop()
+									lt$ = pop()
+									If getTypeId(pointerid) <> 0 Then
+										temps$ = ""
+									Else
+										typeid = pop()
+										temps$ = ".Type" + typeid
+										tp.typePointer = New(typePointer)
+										tp\id = pointerid
+										tp\type_ = typeid
+									EndIf
+									AddLine("TypePointer" + pointerid + temps$ + " = " + lt$, totcmd)
+							EndSelect
+						Case 78 // Taulukkoon sijoitus
+							arrType = pop()
+							a = ReadByte(f)
+							n = ReadInt(f)
+							a = ReadByte(f)
+							arrId = ReadInt(f)
+							
+							tstr$ = ""
+							For a = 1 To n
+								tstr$ = StrInsert(tstr$, 0, ", " + pop())
+							Next a
+							tstr$ = Mid(tstr$, 3)
+							If otherArrayTypes(arrType) = "" Then
+								Print "Unknown arraytype " + arrType
+							EndIf
+
+							addLine(otherArrayTypes(arrType) + "Array" + arrId + "(" + tstr$ + ") = " + pop(), totcmd)
+							i = i + 2
+							cmds = cmds + 2
+						Case 79 // Turhuus
+							//MakeError "We shouldn't be here!"
+							//ReadInt
+						Case 247 // CloseInput jakaa idn muun kanssa
+							addLine("CloseInput", totcmd)
+						Default
+							If intg > 0 and intg <= MAX_COMMANDS Then
+								If commandP(intg) <> -1 Then ' Jos komento ON alustettu tiedet‰‰n parametrien m‰‰r‰
+									If commandP(intg) = 0 Then
+										addLine(commandN(intg), totcmd)
+									Else
+										addLine(commandN(intg) + " " + get(commandP(intg)), totcmd)
+									EndIf
+								Else
+									addline("Unknown operation " + cmd + " - " + intg, 0)
+									Print "Unknown operation " + cmd + " - " + intg
+									WriteLine w, "Unknown operation " + cmd + " - " + intg
+								EndIf
+							Else
+								Print "Unknown operation " + cmd + " - " + intg
+								WriteLine w, "Unknown operation " + cmd + " - " + intg
+							EndIf
+					End Select
+					
+					totcmd = totcmd + cmds
+					cmds = 0
+				Case 68 // Data
+					a = ReadByte(f)
+					totcmd = totcmd + cmds
+					cmds = 0
+				Case 73 
+					pushInt(ReadInt(f), i)
+				Case 74
+					temptype = pop()
+					
+					Select temptype
+						Case 2 // Float pinoon
+							pushFloat(ReadFloat(f))
+						Case 3,4,6,7,8 // Taulukko
+							arrId = ReadInt(f)
+							
+							n = pop()
+							tstr$ = ""
+							For a = 1 To n
+								tstr$ = StrInsert(tstr$, 0, ", " + pop())
+							Next a
+							tstr$ = Mid(tstr$, 3)
+							If temptype > 0 And temptype <= MAX_ARRAYTYPES Then
+								pushString(arrayTypes(temptype) + "Array" + arrId + "(" + tstr + ")")
+							Else
+								Print "Unknown arraytype " + temptype
+							EndIf
+						Case 5 // Merkkijono
+							pushString(Chr(34) + string_(ReadInt(f)) + Chr(34))
+					EndSelect
+				Case 78 // Jotain hyppyjen tai muiden loppuja
+					end_ = ReadInt(f)
+					
+					If end_ >= totcmd Then // Jos loppu ON nykyisen kohdan j‰lkeen tiedet‰‰n ett‰ kohde ON edess‰
+						af.afterParse = New(afterParse)
+						af\s = "EndIf"
+						af\num = end_
+						Addline("If " + pop() + " Then ", totcmd)
+					Else // Jos hyppy ON takanap‰in tiedet‰‰n ett‰ ON Repeat Until sheiccea
+						af.afterParse = New(afterParse)
+						af\s = "Repeat"
+						af\num = end_
+						Addline("Until " + pop(), totcmd)
+					EndIf
+					totcmd = totcmd + cmds
+					cmds = 0
+				Case 79
+					op = ReadByte(f)
+					If op <= MAX_OPS And op > 0 Then
+						If op = 1 Or op = 2 Or op = 21 Then
+							temp$ = operations(op) + " " + pop()
+						Else
+							temp$ = "(" + GetP(GetPAmount() - 1) + " "+operations(op)+" " + GetP(GetPAmount()) + ")"
+							pop()
+							pop()
+						EndIf
+						pushString(temp$)
+					Else
+						Print "Unknown operation " + cmd + " - " + op
+						WriteLine w, "Unknown operation " + cmd + " - " + op
+					EndIf
+				Case 80 // Kait se ON increase muuttujalle
+					d = ReadInt(f)
+					addLine("Integer" + d + "% + 1", totcmd)
+					totcmd = totcmd + cmds
+					cmds = 0
+					num_cmd = num_cmd - 4
+				Case 81 // Ei oo tietoa
+					a = ReadInt(f)
+				Case 84
+					ptrid = ReadInt(f)
+					t = pop()
+					tempstr$ = otherArrayTypes(t) + pop()
+					typeAccess(getTypeId(ptrid), tempstr$ + " As " + otherArrayTypes(t))
+					pushString("TypePointer" + ptrid + "\" + tempstr$)
+				Case 85 // Push funktioptr
+					fptr = ReadInt(f)
+					tstr$ = ""
+					For a = 1 To getFunctionParamAmount(fptr)
+						tstr$ = StrInsert(tstr$, 0, ", " + pop())
+					Next a
+					
+					pushString(getFunctionName(fptr) + "(" + Mid(tstr$, 3) + ")")
+				Case 86 // Push variable
+					temptype = pop()
+					Select temptype
+						Case 1
+							pushString("Integer" + ReadInt(f) + " As Integer")
+						Case 2
+							pushString("Float" + ReadInt(f) + " As Float")
+						Case 3
+							pushString("GlobalInteger" + ReadInt(f) + " As Integer")
+						Case 4
+							pushString("GlobalFloat" + ReadInt(f) + " As Float")
+						Case 5
+							pushString("String" + ReadInt(f) + " As String")
+						Case 6
+							pushString("GlobalString" + ReadInt(f) + " As String")
+						Case 7
+							pushString("Short" + ReadInt(f) + " As Short")
+						Case 8
+							pushString("Byte" + ReadInt(f) + " As Byte")
+						Case 9
+							pushString("GlobalShort" + ReadInt(f) + " As Short")
+						Case 10
+							pushString("GlobalByte" + ReadInt(f) + " As Byte")
+						Case 11
+							d = ReadInt(f)
+							If d = 0 Then
+								pushString("NULL")
+							Else
+								pushString("TypePointer" + d)
+							EndIf
+						Default
+							addLine("Unknown Type " + temptype, 0)
+					EndSelect
+				Case 90
+					op = ReadInt(f)
+					Select op
+						Case 50,52,53
+							tmp = pop()
+							pushInt(tmp)
+							pushString(commandN(op) + "(Type"+tmp+")")
+						Case 647
+							pushString("PickedAngle()")
+						Case 502
+							pop()
+							pushString("Image(" + pop() + ")")
+						Default
+							If op > 0 And op <= MAX_COMMANDS Then
+								If functionP(op) <> -1 Then ' Jos komento ON alustettu tiedet‰‰n parametrien m‰‰r‰
+									If functionP(op) = 0 Then
+										pushString(commandN(op) + "()")
+									Else
+										pushString(commandN(op) + "(" + get(functionP(op)) + ")")
+									EndIf
+								Else
+									AddLine("Unknown operation " + cmd + " - " + op, 0)
+									Print "Unknown operation " + cmd + " - " + op
+								EndIf
+							Else
+								Print "Unknown operation " + cmd + " - " + op
+							EndIf
+					EndSelect
+				Case 97
+
+				Case 98
+
+				Case 99
+
+				Default
+					Print "Unknown opcode " + cmd
+					addLine("Unknown op " + cmd, 0)
+			EndSelect
+		Next i
+		
+		For g.global_ = Each global_
+			l.templine = New(templine)
+			l\s = "Global Global" + otherArrayTypes(g\type_) + "" + g\id + " As " + otherArrayTypes(g\type_)
+			Insert l, First(templine)
+		Next g
+		
+		For af.afterParse = Each afterParse
+			For l.templine = Each templine
+				If af\num = l\cmdlen Then
+					If l = Last(templine) Then
+						ll.templine = New(templine)
+						ll\s = af\s
+						ll\cmdlen = -1
+						Insert l,Last(templine)
+					Else
+						ll.templine = New(templine)
+						ll\s = af\s
+						ll\cmdlen = -1
+						Insert ll, before(l)
+					EndIf
+				EndIf
+			Next l
+		Next af
+		
+		For j.jump = Each jump
+			labels = labels + 1
+			For l.templine = Each templine
+				If j\dest = l\cmdlen Then
+					ll.templine = New(templine)
+					ll\s = "Label" + labels + ":"
+					If l <> First(templine) Then
+						Insert ll, Before(l)
+						If ll = First(templine) Then
+							Insert After(ll), First(templine)
+						EndIf
+					Else
+						Insert ll, First(templine)
+						//Insert l, First(templine)
+					EndIf
+				EndIf
+				If j\src = l\cmdlen Then
+					l\s = l\s + "Label" + labels
+				EndIf
+			Next l
+		Next j
+		
+		For typ.bytecodetype_ = Each bytecodetype_
+			For tt.typeVariable = Each typeVariable
+				If tt\id = typ\id Then
+					For l.templine = Each templine
+						If typ\st = l\cmdlen Then
+							ll.templine = New(templine)
+							ll\s = "Field " + tt\name$
+							If l = First(templine) Then
+								Insert ll, First(templine)
+								Insert l, First(templine)
+							Else
+								Insert ll, Before(l)
+								Insert l, Before(ll)
+							EndIf
+						EndIf
+					Next l
+				EndIf
+			Next tt
+		Next typ
+
+		If inFunction Then
+			addLine("EndFunction", 0)
+		EndIf
+		
+		If useTabs Then
+			identadd$ = Chr(9)
+		Else
+			identadd$ = "    "
+		EndIf
+		ident$ = ""
+		
+		For l.templine = Each templine
+			If (Left(l\s, 5) = "EndIf" And Len(l\s) = 5) Or (Left(l\s, 4) = "Wend" And Len(l\s) = 4) Or (Left(l\s, 5) = "Until" And Len(l\s) = 5)  Or (Left(l\s, 11) = "EndFunction" And Len(l\s) = 11) or (Left(l\s, 7) = "EndType" And Len(l\s) = 7)Then
+				ident$ = Left(ident$, Len(ident$) - Len(identadd))
+			EndIf
+			Print ident$ + l\s + " - " + l\cmdlen
+			WriteLine w, ident$ + l\s
+			If (Left(l\s, 3) = "If ") Or (Left(l\s, 6) = "While ") Or (Left(l\s, 7) = "Repeat ")  Or (Left(l\s, 9) = "Function ") Or (Left(l\s, 5) = "Type ") Then
+				ident$ = ident$ + identadd
+			EndIf
+		Next l
+		
+
+		CloseFile w
+	CloseFile f
+	w = OpenToWrite(outDir + "\info.txt")
+		WriteLine w, "Program Length: " + num_cmd + " opcodes"
+		WriteLine w, num_strings + " String in exe"
+		WriteLine w, getStackLength() + " items in stack"
+		WriteLine w, "Stack:"
+		sl = getStackLength()
+		For i = 1 To sl
+			p.pp = Last(pp)
+			WriteLine w, pop()
+		Next i
+	CloseFile w
+WaitKey

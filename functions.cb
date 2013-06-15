@@ -1,0 +1,274 @@
+//GetWord2
+//		Paranneltu versio cbn GetWord() -funktiosta
+//@param a: Merkkijono mistä etsitään
+//@param b: Monettako sanaa etsitään
+//@param c: Erotin
+//@return: Palauttaan b:nnen sanan merkkijonosta a
+Function GetWord2(a As String, b As Integer, c As String)
+    Dim aa As String
+    aa = a
+    For i As Integer = 1 To (b-1)
+        If Instr(aa, c) Then
+            aa = Mid(aa, Instr(aa,c)+1)
+        EndIf
+    Next i
+    If Instr(aa,c) Then
+        Return Mid(aa, 1, Instr(aa,c)-1)
+    Else
+        Return Mid(aa, 1)
+    EndIf
+End Function
+
+//AddCommand
+//		Yhdistää komennon tai funktion opcodeen
+//@param num: Opcode
+//@param name: Funktion tai komennon nimi
+//@param type_: 0 - komento, 1 - funktio, 2 - molemmat
+//@param params: Montako parametria ottaa
+//@param params2: Montako parametria funktio ottaa, jos type_ = 2
+Function AddCommand(num As Integer, name As String, type_ As Byte, params As Byte, params2 = 0)
+	commandN(num) = name
+	Select type_
+		Case 0 // Komento
+			commandP(num) = params
+		Case 1 // Funktio
+			functionP(num) = params
+		Case 2 // Komento ja funktio
+			commandP(num) = params
+			functionP(num) = params2
+	EndSelect
+EndFunction
+
+//GlobalAccess
+//		Merkitsee globaalin muuttujan olemassaolevaksi, jos sitä ei ole vielä merkitty
+//@param id: Globaalin muuttujan numero
+//@param type_: Globaalin muuttujan tyyppi
+Function GlobalAccess(id, type_)
+	For g.global_ = Each global_
+		If g\id = id And g\type_ = type_ Then Return 0
+	Next g
+	
+	g.global_ = New(global_)
+	g\id = id
+	g\type_ = type_
+EndFunction
+
+//GetFunctionID
+//		Hakee funktion numeron nimen perusteella
+//@param name: Funktion nimi
+//@return: Funktion numero
+Function GetFunctionID(name As String)
+	For fu.function_ = Each function_
+		If fu\name = name Then Return fu\id
+	Next fu
+EndFunction
+
+//GetFunctionParamAmount
+//		Hakee funktion parametrien määrän
+//@param id: Funktion id
+//@return: Funktion parametrien määrä
+Function GetFunctionParamAmount(id As Integer)
+	For fu.function_ = Each function_
+		If fu\id = id Then Return fu\p
+	Next fu
+EndFunction
+
+//GetFunctionName
+//		Hakee funktion nimen numeron perusteella
+//@param id: Funktion numero
+//@return: Funktion nimi
+Function GetFunctionName(id As Integer)
+	For fu.function_ = Each function_
+		If fu\id = id Then Return fu\name
+	Next fu
+EndFunction
+
+//GetTypeID
+//		Hakee tyypin numeron osoittimen perusteella
+//@param pointer: Osoitin (tyypin sijainti tavukoodissa)
+//@return: Tyypin numero
+Function GetTypeID(pointer As Integer)
+	For tp.typePointer = Each typePointer
+		If tp\id = pointer Then Return tp\type_
+	Next tp
+EndFunction
+
+//TypeAccess
+//		Merkitsee tyypin olemassaolevaksi, jos sitä ei ole vielä merkitty
+//@param id: Tyypin numero
+//@param stri: Tyypin nimi
+Function TypeAccess(id, stri$)
+	Print "TypeAccess " + id + ", " + stri
+	For tv.typevariable = Each typevariable
+		If tv\id = id And tv\name$ = stri Then Return 0 
+	Next tt
+	tv.typevariable = New(typevariable)
+	tv\id = id
+	tv\name = stri
+EndFunction
+
+//GetStackLength
+//		Hakee pinon pituuden
+//@return: Pinon pituus
+Function getStackLength()
+	c = 0
+	For p.pp = Each pp
+		c + 1
+	Next p
+	Return c
+EndFunction
+
+//Pop
+//		Hakee pinon päälimmäisen jäsenen ja poistaa sen
+//@return: Pinossa päälimmäisenä oleva arvo
+Function pop()
+	temp.pp = Last(pp)
+	If temp <> NULL Then
+		t = temp\type_
+		Dim a1 As Byte
+		Dim a2 As Integer
+		Dim a3 As String
+		Dim a4 As Float
+		a1 = temp\vbyte
+		a2 = temp\vint
+		a3 = temp\vstring
+		a4 = temp\vfloat
+		
+		Delete temp
+		
+		Select t
+			Case 1
+				Return a1
+			Case 2
+				Return a2
+			Case 3
+				Return a3
+			Case 4
+				Return a4
+		End Select
+	Else
+		Print "Nothing To pop()..."
+		Return -1506006
+	EndIf
+EndFunction
+
+//ClearTypePointers
+//		Poistaa kaikki tyyppiosoittimet kokoelmasta
+Function ClearTypePointers()
+	For t.typePointer = Each typePointer
+		Delete t
+	Next t
+EndFunction
+
+//PushByte
+//		Lisää tavun pinoon
+//@param b: Lisättävä tavu
+Function PushByte(b As Byte)
+	p.pp = New(pp)
+	p\vByte = b
+	p\type_ = 1
+EndFunction
+
+//PushInt
+//		Lisää kokonaisluvun pinoon
+//@param intg: Lisättävä kokonaisluku
+Function PushInt(intg As Integer)
+	p.pp = New(pp)
+	p\vInt = intg
+	p\type_ = 2
+EndFunction
+
+Function pushString(str_ As String)
+	p.pp = New(pp)
+	p\vString = str_
+	p\type_ = 3
+EndFunction
+
+Function pushFloat(flt As Float)
+	p.pp = New(pp)
+	p\vFloat = flt
+	p\type_ = 4
+EndFunction
+
+Function AddLine(txt$, cmdnum, line_num = 0)
+	If line_num = 0 Then
+		ll.templine = New(templine)
+		ll\s = txt$
+		ll\cmdlen = cmdnum
+		//Print txt + "   " + cmdnum
+		Return 0
+	EndIf
+	For l.templine = Each templine
+		i + 1
+		If i = line_num Then
+			ll.templine = New(templine)
+			ll\s = txt$
+			ll\cmdlen = cmdnum
+			If l = Last(templine) Then
+				Insert ll, Last(templine)
+			Else
+				Insert ll, Before(l)
+			EndIf
+			Return 0
+		EndIf
+	Next l
+EndFunction
+
+Function DeleteP(num)
+	For p.pp = Each pp
+		i + 1
+		If i = num Then
+			Delete p
+			Return 1
+		EndIf
+	Next p
+EndFunction
+
+Function get(n As Byte)
+	For i = 1 To n
+		ret$ = StrInsert(ret$, 0, ", " + pop())
+	Next i
+	Return Mid(ret$, 3)
+EndFunction
+
+Function GetPAmount()
+	For p.pp = Each pp
+		i + 1
+	Next p
+	Return i
+EndFunction
+
+Function GetP(num)
+	For p.pp = Each pp
+		i + 1
+		If i = num Then
+			Select p\type_
+				Case 1
+					Return p\vbyte
+				Case 2
+					Return p\vint
+				Case 3
+					Return p\vstring
+				Case 4
+					Return p\vfloat
+			EndSelect
+		EndIf
+	Next p
+EndFunction 
+
+Function CleanMem()
+	For p.pp = Each pp
+		Delete p
+	Next p
+EndFunction
+
+Function DecryptExeString(stri$)
+	key$ = "Mark Sibly is my idol!"
+	a = 1
+	For i = 1 To Len(stri$)
+		ret$ = ret$ + Chr(Asc(Mid(stri, i, 1)) - Asc(Mid(key, a, 1)))
+		a + 1
+		If a > Len(key) Then a = 1
+	Next i
+	Return Replace(Replace(ret$,Chr(247),Chr(246)),Chr(229),Chr(228))
+EndFunction

@@ -1,0 +1,115 @@
+Const MAX_OPS = 21
+Const MAX_COMMANDS = 1000
+Const MAX_ARRAYTYPES = 8
+
+Global labels
+Global arrays
+Global types
+Global functions
+Global globals
+Global inFunction
+Global skipGotos
+
+Dim operations(MAX_OPS) As String
+Dim string_(1) As String
+Dim arrayTypes(MAX_ARRAYTYPES) As String
+Dim otherArrayTypes(MAX_ARRAYTYPES) As String
+
+Dim commandN(MAX_COMMANDS) As String ' Komennon nimi
+Dim commandP(MAX_COMMANDS) As Integer ' Montako parametria jos on komento
+Dim functionP(MAX_COMMANDS) As Integer ' Montako parametria jos on funktio
+
+// Pino. Mahdollista laittaa tavu, int, merkkijono, liukuluku
+Type pp
+	Field vbyte As Byte
+	Field vint As Integer
+	Field vstring As String
+	Field vfloat As Float
+	Field type_ As Byte
+EndType
+
+Type global_
+	Field id As Integer
+	Field type_ As Byte
+EndType
+
+Type function_
+	Field p As Integer
+	Field id As Integer
+	Field name As String
+EndType
+
+Type array
+	Field id As Integer
+	Field name As String
+EndType
+
+Type typeVariable
+	Field name$
+	Field id As Integer
+EndType
+
+Type typePointer
+	Field id As Integer
+	Field type_ As Integer
+EndType
+
+Type bytecodetype_
+	Field st As Integer
+	Field id As Integer
+EndType
+
+Type afterParse
+	Field s As String
+	Field num As Integer
+EndType
+
+Type jump
+	Field dest	// Hypyn loppu
+	Field src	// Hypyn alku
+EndType
+
+Type templine
+	Field s As String
+	Field cmdlen
+	Field numcmd As Integer
+EndType
+
+For i = 0 To MAX_COMMANDS
+	commandP(i) = -1
+	functionP(i) = -1
+Next i
+
+operations(1) = "-"
+operations(2) = "+"
+operations(3) = "^"
+operations(4) = "+"
+operations(5) = "-"
+operations(6) = "*"
+operations(7) = "/"
+operations(8) = "Mod"
+operations(9) = "Shl"
+operations(10) = "Shr"
+operations(11) = "Sar"
+operations(12) = "<"
+operations(13) = ">"
+operations(14) = "="
+operations(15) = "<>"
+operations(16) = "<="
+operations(17) = ">="
+operations(18) = "And"
+operations(19) = "Or"
+operations(20) = "Xor"
+operations(21) = "Not"
+
+arrayTypes(3) = "Integer"
+arrayTypes(4) = "Float"
+arrayTypes(6) = "String"
+arrayTypes(7) = "Short"
+arrayTypes(8) = "Byte"
+
+otherArrayTypes(1) = "Integer"
+otherArrayTypes(2) = "Float"
+otherArrayTypes(3) = "String"
+otherArrayTypes(4) = "Short"
+otherArrayTypes(5) = "Byte"
